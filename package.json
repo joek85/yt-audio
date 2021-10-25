@@ -1,0 +1,15 @@
+{
+  "name": "yt-audio",
+  "version": "1.0.0",
+  "description": "YouTube audio",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Joe Kaikaty",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.23.0",
+    "miniget": "^4.2.1"
+  }
+}
