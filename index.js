@@ -1,8 +1,12 @@
 const axios = require('axios');
 const querystring = require('querystring');
 const miniget = require('miniget');
+
 const PLAYER_URL = 'https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
 const RELATED_URL = 'https://www.youtube.com/youtubei/v1/next?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const CHANNEL_URL = 'https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const SEARCH_URL = 'https://www.youtube.com/youtubei/v1/search?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+
 const BASE_URL = 'https://www.youtube.com/watch?v=';
 const EMBED_URL = 'https://www.youtube.com/embed/';
 
@@ -18,38 +22,48 @@ const context = JSON.parse(JSON.stringify(DEFAULT_CONTEXT));
 const ytaudio = () => {
 
 };
-const exposedMiniget = (url, options = {}, requestOptionsOverwrite) => {
-    const req = miniget(url, requestOptionsOverwrite || options.requestOptions);
-    if (typeof options.requestCallback === 'function') options.requestCallback(req);
-    return req;
+const getSearchResults = async (searchQuery) => {
+    let data = {context: context, query: searchQuery};
+    try {
+        const response = await axios.post(SEARCH_URL, data, {
+            headers: {'content-type': 'application/json'}
+        });
+        return parseSearchResults(response.data)
+    } catch (err) {
+        console.log(err);
+        return err
+    }
 };
+
 const getPlayerdata = async (videoId) => {
     let data = {context: context, videoId: videoId};
     try {
-        const response = await axios.post(PLAYER_URL, data);
+        const response = await axios.post(PLAYER_URL, data, {
+            headers: {'content-type': 'application/json'}
+        });
         // console.log(decipherFormats(response.data.streamingData.adaptiveFormats))
         // decipherFormats(response.data.streamingData.adaptiveFormats)
-        console.log(response.data.cards.cardCollectionRenderer.cards[0].cardRenderer)
+        // console.log(response.data.cards.cardCollectionRenderer.cards[0].cardRenderer)
         return getVideoDetails(response.data)
     } catch (err) {
-        console.log(err)
+        console.log(err);
         return err
     }
 };
 const getVideoDetails = (data) => {
     let videoDetails = {};
-    // console.log(data.videoDetails)
+    // console.log(data)
     videoDetails.videoId = data.videoDetails.videoId;
     videoDetails.thumbnails = data.videoDetails.thumbnail.thumbnails;
     videoDetails.title = data.videoDetails.title;
     videoDetails.isLive = data.videoDetails.isLive;
     videoDetails.channelId = data.videoDetails.channelId;
     videoDetails.author = data.videoDetails.author;
-    videoDetails.authorThumbnail = data.annotations[0].playerAnnotationsExpandedRenderer.featuredChannel.watermark.thumbnails[0].url;
+    // videoDetails.authorThumbnail = data.annotations[0].playerAnnotationsExpandedRenderer.featuredChannel.watermark.thumbnails[0].url;
     videoDetails.tags = data.videoDetails.keywords;
     videoDetails.viewCount = data.videoDetails.viewCount;
     videoDetails.publishDate = data.microformat.playerMicroformatRenderer.publishDate;
-    videoDetails.description = data.videoDetails.shortDescription;
+    videoDetails.description = (data.videoDetails.shortDescription);
 
     videoDetails.lengthSeconds = data.videoDetails.lengthSeconds;
     // videoDetails.audioFormats = data.streamingData.adaptiveFormats.find((formats) => {
@@ -60,26 +74,297 @@ const getVideoDetails = (data) => {
     // console.log(videoDetails.authorThumbnail)
     return videoDetails;
 };
-
+const getChannelInfos = async (channelId) => {
+    let data = {context: context, browseId: channelId};
+    try {
+        const response = await axios.post(CHANNEL_URL, data);
+        return parseChannelInfos(response.data)
+    } catch (err) {
+        return err
+    }
+};
+const getChannelPlaylists = async (channelId, clickTrackingParams, params) => {
+    let data = {
+        context: context,
+        browseId: channelId,
+        clickTracking: {clickTrackingParams: clickTrackingParams},
+        params: params,
+    };
+    try {
+        const response = await axios.post(CHANNEL_URL, data);
+        return parseChannelPlaylists(response.data)
+    } catch (err) {
+        return err
+    }
+};
 const getRelatedVideos = async (videoId, continuation, tracking) => {
-  try {
-      const response = await axios({
-          method: 'post',
-          url: RELATED_URL,
-          headers: {'content-type': 'application/json'},
-          data: {
-              context: context,
-              videoId: videoId,
-              continuation: continuation,
-              clickTracking: {clickTrackingParams: tracking}
-          }
-      });
-      // console.log(response.data.contents.twoColumnWatchNextResults.secondaryResults.secondaryResults.results[2].compactPlaylistRenderer.sidebarThumbnails[0])
-      return parseRelatedVideos(response.data);
-  }catch (err) {
-      console.log(err)
-      return err
+    try {
+        const response = await axios({
+            method: 'post',
+            url: RELATED_URL,
+            headers: {'content-type': 'application/json'},
+            data: {
+                context: context,
+                videoId: videoId,
+                continuation: continuation,
+                clickTracking: {clickTrackingParams: tracking}
+            }
+        });
+        // console.log(response.data.contents.twoColumnWatchNextResults.secondaryResults.secondaryResults.results[2].compactPlaylistRenderer.sidebarThumbnails[0])
+        return parseRelatedVideos(response.data);
+    }catch (err) {
+        console.log(err)
+        return err
+    }
+};
+const getPlaylist = async (browseId, clickTrackingParams) => {
+    let data = {
+        context: context,
+        browseId: browseId,
+        clickTracking: {clickTrackingParams: clickTrackingParams},
+    };
+    try {
+        const response = await axios.post(CHANNEL_URL, data);
+        return parsePlaylist(response.data)
+    } catch (err) {
+        return err
+    }
+};
+const parsePlaylist = (data) => {
+    let playlist = {sidebar: {}, videos: []};
+    let sidebar = data.sidebar.playlistSidebarRenderer.items[0].playlistSidebarPrimaryInfoRenderer;
+    playlist.sidebar = {
+      thumnails: sidebar.thumbnailRenderer.playlistVideoThumbnailRenderer.thumbnail.thumbnails,
+        title: sidebar.title.runs[0].text,
+        videoCounts: sidebar.stats[0].runs[0].text + sidebar.stats[0].runs[1].text,
+        views: sidebar.stats[1].simpleText,
+        published: sidebar.stats[2].runs[0].text + sidebar.stats[2].runs[1].text
+    };
+
+    let tab = data.contents.twoColumnBrowseResultsRenderer.tabs[0];
+    let contents = tab.tabRenderer.content.sectionListRenderer.contents;
+    let renderers = contents.itemSectionRenderer.contents[0].playlistVideoListRenderer;
+    for (video of renderers.contents){
+        playlist.videos.push({
+            videoId: video.videoRenderer.videoId,
+            thumbnails: prepImg(video.videoRenderer.thumbnail.thumbnails)[0],
+            title: video.videoRenderer.title.simpleText,
+            published: video.videoRenderer.publishedTimeText ? video.videoRenderer.publishedTimeText.simpleText : '',
+            views: video.videoRenderer.shortViewCountText.simpleText,
+            subtitle: video.videoRenderer.shortBylineText ? video.videoRenderer.shortBylineText.runs[0].text : '',
+            duration: video.videoRenderer.lengthText.simpleText
+        })
+    }
+
+    return playlist;
+};
+const parsePlaylists = (playlist) => {
+  let playlists = {};
+  if (playlist.gridPlaylistRenderer) {
+      playlists = {
+          playlistId: playlist.gridPlaylistRenderer.playlistId,
+          thumbnails: prepImg(playlist.gridPlaylistRenderer.thumbnail.thumbnails)[0],
+          title: playlist.gridPlaylistRenderer.title.runs[0].text,
+          subtitle: playlist.gridPlaylistRenderer.shortBylineText ? playlist.gridPlaylistRenderer.shortBylineText.runs[0].text : '',
+          videoCounts: playlist.gridPlaylistRenderer.videoCountShortText.simpleText,
+          browsId: playlist.gridPlaylistRenderer.viewPlaylistText.runs[0].navigationEndpoint.browseEndpoint.browseId,
+          clickTrackingParams: playlist.gridPlaylistRenderer.viewPlaylistText.runs[0].navigationEndpoint.clickTrackingParams
+      }
   }
+  return playlists
+};
+const parseChannelInfos = (data) => {
+    let channelInfos = {header: {}, items: []};
+    let header = data.header.c4TabbedHeaderRenderer;
+    let tabs = data.contents.twoColumnBrowseResultsRenderer.tabs;
+
+    if (header) {
+        channelInfos.header.channelId = header.channelId;
+        channelInfos.header.title = header.title;
+        channelInfos.header.avatar = prepImg(header.avatar.thumbnails)[0];
+        channelInfos.header.banner = header.banner ? prepImg(header.banner.thumbnails)[0] : [];
+        channelInfos.header.subscribers = header.subscriberCountText ? header.subscriberCountText.simpleText : '';
+        channelInfos.header.descriptions = data.metadata.channelMetadataRenderer.description;
+    }
+
+    if (tabs) {
+        for (let tab of tabs || []) {
+            let item = {tabs: {title: '', items: []}};
+            if (tab.tabRenderer) {
+                switch (tab.tabRenderer.title) {
+                    case 'Home':
+                        let contents = tab.tabRenderer.content;
+                        if (contents) {
+                            let sectionListRenderer = contents.sectionListRenderer.contents;
+                            for (let itemSectionRenderer of sectionListRenderer) {
+                                let SectionRenderer = itemSectionRenderer.itemSectionRenderer.contents[0];
+                                if (SectionRenderer.channelVideoPlayerRenderer) {
+                                    item.tabs.items.push({
+                                        type: 'channelVideo',
+                                        videoId: SectionRenderer.channelVideoPlayerRenderer.videoId,
+                                        title: SectionRenderer.channelVideoPlayerRenderer.title.runs[0].text,
+                                        description: SectionRenderer.channelVideoPlayerRenderer.description ? SectionRenderer.channelVideoPlayerRenderer.description.runs[0].text : '',
+                                        views: SectionRenderer.channelVideoPlayerRenderer.viewCountText.simpleText,
+                                        published: SectionRenderer.channelVideoPlayerRenderer.publishedTimeText.runs[0].text
+                                    })
+                                }else if (SectionRenderer.channelFeaturedContentRenderer) {
+                                    let videos = [];
+                                    for (let video of SectionRenderer.channelFeaturedContentRenderer.items){
+                                        videos.push({
+                                            videoId: video.videoRenderer.videoId,
+                                            thumbnails: prepImg(video.videoRenderer.thumbnail.thumbnails)[0],
+                                            title: video.videoRenderer.title.runs[0].text,
+                                            views: video.videoRenderer.shortViewCountText.runs[0].text + video.videoRenderer.shortViewCountText.runs[1].text,
+                                            description: video.videoRenderer.descriptionSnippet.runs[0].text
+                                        })
+                                    }
+                                    item.tabs.items.push({
+                                        type: 'channelFeaturedVideos',
+                                        title: SectionRenderer.channelFeaturedContentRenderer.title.runs[0].text + SectionRenderer.channelFeaturedContentRenderer.title.runs[1].text,
+                                        videos: videos
+                                    })
+                                }else if (SectionRenderer.shelfRenderer){
+                                    let videos = {type: '', items: []};
+                                    if (SectionRenderer.shelfRenderer.content.horizontalListRenderer) {
+                                        for (let video of SectionRenderer.shelfRenderer.content.horizontalListRenderer.items){
+                                            if (video.gridVideoRenderer){
+                                                videos.type = 'videos';
+                                                videos.items.push({
+                                                    videoId: video.gridVideoRenderer.videoId,
+                                                    thumbnails: prepImg(video.gridVideoRenderer.thumbnail.thumbnails)[0],
+                                                    title: video.gridVideoRenderer.title.simpleText,
+                                                    published: video.gridVideoRenderer.publishedTimeText ? video.gridVideoRenderer.publishedTimeText.simpleText : '',
+                                                    views: video.gridVideoRenderer.shortViewCountText ? video.gridVideoRenderer.shortViewCountText.simpleText: '',
+                                                    subtitle: video.gridVideoRenderer.shortBylineText ? video.gridVideoRenderer.shortBylineText.runs[0].text : '',
+                                                    duration: video.gridVideoRenderer.thumbnailOverlays[0].thumbnailOverlayTimeStatusRenderer.text.simpleText
+                                                })
+                                            }else if (video.gridPlaylistRenderer){
+                                                videos.type = 'playlists';
+                                                videos.items.push(parsePlaylists(video))
+                                            }else if (video.gridChannelRenderer){
+                                                videos.type = 'channel';
+                                                videos.items.push({
+                                                    channelId: video.gridChannelRenderer.channelId,
+                                                    thumbnails: prepImg(video.gridChannelRenderer.thumbnail.thumbnails)[0],
+                                                    videoCounts: video.gridChannelRenderer.videoCountText.runs[0].text,
+                                                    subscribers: video.gridChannelRenderer.subscriberCountText ? video.gridChannelRenderer.subscriberCountText.simpleText : '',
+                                                    title: video.gridChannelRenderer.title.simpleText
+                                                })
+                                            }
+                                        }
+                                    }else if (SectionRenderer.shelfRenderer.content.expandedShelfContentsRenderer) {
+                                        for (let video of SectionRenderer.shelfRenderer.content.expandedShelfContentsRenderer.items){
+                                            if (video.videoRenderer) {
+                                                videos.type = 'videos';
+                                                videos.items.push({
+                                                    videoId: video.videoRenderer.videoId,
+                                                    thumbnails: prepImg(video.videoRenderer.thumbnail.thumbnails)[0],
+                                                    title: video.videoRenderer.title.simpleText,
+                                                    published: video.videoRenderer.publishedTimeText ? video.videoRenderer.publishedTimeText.simpleText : '',
+                                                    views: video.videoRenderer.shortViewCountText.simpleText,
+                                                    subtitle: video.videoRenderer.shortBylineText ? video.videoRenderer.shortBylineText.runs[0].text : '',
+                                                    duration: video.videoRenderer.lengthText.simpleText
+                                                })
+                                            }else if (video.playlistRenderer) {
+                                                videos.type = 'playlists';
+                                                videos.items.push({
+                                                    playlistId: video.playlistRenderer.playlistId,
+                                                    thumbnails: prepImg(video.playlistRenderer.thumbnails[0].thumbnails)[0],
+                                                    title: video.playlistRenderer.title.simpleText,
+                                                    subtitle: video.playlistRenderer.shortBylineText.runs[0].text,
+                                                    videoCounts: video.playlistRenderer.videoCountText.runs[0].text,
+                                                })
+                                            }else if (video.channelRenderer) {
+                                                videos.type = 'channel';
+                                                videos.items.push({
+                                                    channelId: video.channelRenderer.channelId,
+                                                    thumbnails: prepImg(video.channelRenderer.thumbnail.thumbnails)[0],
+                                                    videoCounts: video.channelRenderer.videoCountText.runs[0].text,
+                                                    subscribers: video.channelRenderer.subscriberCountText ? video.channelRenderer.subscriberCountText.simpleText : '',
+                                                    title: video.channelRenderer.title.simpleText
+                                                })
+                                            }
+                                        }
+                                    }
+                                    item.tabs.items.push({
+                                        type: 'shelf',
+                                        title: SectionRenderer.shelfRenderer.title.runs[0].text,
+                                        subtitle: SectionRenderer.shelfRenderer.subtitle ? SectionRenderer.shelfRenderer.subtitle.simpleText : '',
+                                        videos: videos
+                                    })
+                                }
+                            }
+                            item.tabs.title = tab.tabRenderer.title;
+                            channelInfos.items.push(item)
+                        }
+                        break;
+                    case 'Videos':
+                        item.tabs.title = tab.tabRenderer.title;
+                        item.tabs.items.push({
+                            clickTrackingParams: tab.tabRenderer.endpoint.clickTrackingParams,
+                            browseId: tab.tabRenderer.endpoint.browseEndpoint.browseId,
+                            params: tab.tabRenderer.endpoint.browseEndpoint.params
+                        });
+                        channelInfos.items.push(item);
+                        break;
+                    case 'Playlists':
+                        item.tabs.title = tab.tabRenderer.title;
+                        item.tabs.items.push({
+                            clickTrackingParams: tab.tabRenderer.endpoint.clickTrackingParams,
+                            browseId: tab.tabRenderer.endpoint.browseEndpoint.browseId,
+                            params: tab.tabRenderer.endpoint.browseEndpoint.params
+                        });
+                        channelInfos.items.push(item);
+                        break;
+                }
+            }
+        }
+    }
+
+    return channelInfos;
+};
+const parseChannelPlaylists = (data) => {
+    let playlists = [];
+
+    let tabs = data.contents.twoColumnBrowseResultsRenderer.tabs;
+    if (tabs) {
+        for (let tab of tabs || []) {
+            if (tab.tabRenderer) {
+                if (tab.tabRenderer.title) {
+                    switch (tab.tabRenderer.title) {
+                        case 'Playlists':
+                            let contents = tab.tabRenderer.content.sectionListRenderer.contents;
+                            for (let content of contents) {
+                                let renderers = content.itemSectionRenderer.contents[0];
+                                let p = {type: '', title: '', items: []};
+                                if (renderers.gridRenderer){
+                                    let items = renderers.gridRenderer.items;
+                                    p.type = 'grid';
+                                    for (let playlist of items) {
+                                        p.items.push(parsePlaylists(playlist))
+                                    }
+
+                                }else if (renderers.shelfRenderer) {
+                                    let items = renderers.shelfRenderer.content.horizontalListRenderer.items;
+                                    let title = renderers.shelfRenderer.title.runs[0].text;
+                                    p.type = 'shelf';
+                                    p.title = title;
+                                    for (let playlist of items){
+                                        p.items.push(parsePlaylists(playlist))
+                                    }
+                                }
+                                playlists.push(p)
+                            }
+                            break;
+                    }
+                }else {
+
+                }
+
+            }
+        }
+    }
+    return playlists
 };
 const parseRelatedVideos = (data) => {
     let secondaryResults;
@@ -108,8 +393,8 @@ const parseRelatedVideos = (data) => {
         let details = result.compactVideoRenderer;
         if (details) {
 
-            let viewCount = details.viewCountText.simpleText;
-            let shortViewCount = details.shortViewCountText.simpleText;
+            let viewCount = details.viewCountText ? details.viewCountText.simpleText : '';
+            let shortViewCount = details.shortViewCountText ? details.shortViewCountText.simpleText : '';
 
             let browseEndpoint = details.shortBylineText.runs[0].navigationEndpoint.browseEndpoint;
             let channelId = browseEndpoint.browseId;
@@ -127,17 +412,14 @@ const parseRelatedVideos = (data) => {
                     user,
                     channel_url: `https://www.youtube.com/channel/${channelId}`,
                     user_url: `https://www.youtube.com/user/${user}`,
-                    thumbnails: details.channelThumbnail.thumbnails.map(thumbnail => {
-                        thumbnail.url = new URL(thumbnail.url, BASE_URL).toString();
-                        return thumbnail;
-                    }),
+                    thumbnails: prepImg(details.channelThumbnail.thumbnails)[0],
                     // verified: isVerified(details.ownerBadges),
 
                 },
                 short_view_count_text: shortViewCount,
                 view_count: viewCount,
                 length_seconds: details.lengthText !== undefined ?  details.lengthText.simpleText: '',
-                thumbnails: details.thumbnail.thumbnails,
+                thumbnails: prepImg(details.thumbnail.thumbnails)[0],
                 richThumbnails:
                     details.richThumbnail ?
                         details.richThumbnail.movingThumbnailRenderer.movingThumbnailDetails.thumbnails : [],
@@ -154,8 +436,8 @@ const parseRelatedVideos = (data) => {
                     type:'plalist',
                     id: playlistRenderer.playlistId,
                     title: playlistRenderer.title.simpleText,
-                    thumbnail: playlistRenderer.thumbnail.thumbnails,
-                    published: playlistRenderer.publishedTimeText.simpleText,
+                    thumbnail: prepImg(playlistRenderer.thumbnail.thumbnails)[0],
+                    published: playlistRenderer.publishedTimeText ? playlistRenderer.publishedTimeText.simpleText: '',
                     count: playlistRenderer.videoCountShortText.simpleText
                 };
                 videos.push(playlist)
@@ -168,6 +450,136 @@ const parseRelatedVideos = (data) => {
     return related
 };
 
+const parseSearchResults = (data) => {
+    let estimatedResults = data.estimatedResults;
+    let refinements = data.refinements;
+    let primaryContents = data.contents.twoColumnSearchResultsRenderer.primaryContents;
+    let secondaryContents = data.contents.twoColumnSearchResultsRenderer.secondaryContents;
+    let continuation = {};
+
+    let primaryResults = [];
+
+    let contents = findKey(primaryContents, 'sectionListRenderer').contents;
+    let itemSectionRenderer = contents[0].itemSectionRenderer.contents;
+    let continuationItemRenderer = contents[1].continuationItemRenderer;
+    if (continuationItemRenderer) {
+        continuation = {
+            clickTrackingParams: continuationItemRenderer.continuationEndpoint.clickTrackingParams,
+            token: continuationItemRenderer.continuationEndpoint.continuationCommand.token
+        }
+    }
+    if (itemSectionRenderer) {
+        for (let i of itemSectionRenderer) {
+            switch (Object.keys(i)[0]) {
+                case 'videoRenderer':
+                    primaryResults.push({
+                        type: 'video',
+                        items: parseVideoRenderer(i.videoRenderer)
+                    });
+                    break;
+                case 'channelRenderer':
+                    primaryResults.push({
+                        type: 'channel',
+                        items: parseChannelRenderer(i.channelRenderer)
+                    });
+                    break;
+                case 'shelfRenderer':
+                    primaryResults.push({
+                        type: 'shelf',
+                        items: parseShelfRenderer(i.shelfRenderer)
+                    });
+                    break;
+                case 'horizontalCardListRenderer':
+                    primaryResults.push({
+                        type: 'cards',
+                        items: parseCards(i.horizontalCardListRenderer)
+                    });
+                    break;
+            }
+        }
+    }
+
+
+    return {
+        primaryResults: primaryResults,
+        continuation: continuation,
+        estimatedResults: estimatedResults,
+        refinements: refinements
+    }
+};
+const parseVideoRenderer = (renderer) => {
+    // console.log(renderer)
+    return {
+        videoId: renderer.videoId,
+        title: renderer.title.runs[0].text,
+        thumbnail: prepImg(renderer.thumbnail.thumbnails)[0],
+        publishedT: renderer.publishedTimeText.simpleText,
+        duration: renderer.lengthText.simpleText,
+        views: renderer.shortViewCountText.simpleText,
+        author: {
+            name:renderer.shortBylineText.runs[0].text,
+            thumbnail: prepImg(renderer.channelThumbnailSupportedRenderers.channelThumbnailWithLinkRenderer.thumbnail.thumbnails)[0],
+            channelId: renderer.shortBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId
+        }
+    }
+};
+const parseChannelRenderer = (renderer) => {
+    return {
+        channelId: renderer.channelId,
+        title: renderer.title.simpleText,
+        thumbnail: prepImg(renderer.thumbnail.thumbnails)[0],
+        videoCounts: renderer.videoCountText.runs[0].text + renderer.videoCountText.runs[1].text,
+        description: renderer.descriptionSnippet.runs[0].text
+    }
+};
+const parseShelfRenderer = (renderer) => {
+    let videos = [];
+    let items = renderer.content.verticalListRenderer.items;
+    for (let video of items) {
+        videos.push(parseVideoRenderer(video.videoRenderer))
+    }
+    return {
+        title: renderer.title.simpleText,
+        videos: videos
+    }
+};
+const parseCards = (renderer) => {
+    let searchRefinments = [];
+    let cards = renderer.cards;
+    for (let card of cards) {
+        searchRefinments.push({
+            query: card.searchRefinementCardRenderer.query.runs[0].text,
+            thumbnail: prepImg(card.searchRefinementCardRenderer.thumbnail.thumbnails)[0]
+        })
+    }
+    return {
+        title: renderer.header.richListHeaderRenderer.title.simpleText,
+        searchRefinments: searchRefinments
+    }
+};
+
+function findKey(obj, key) {
+    for ([k, v] of Object.entries(obj)){
+        if (k === key) return v;
+        if (typeof v === 'object' &&  v !== null ){
+            let found = findKey(v, key);
+            if (found) return found
+        }
+    }
+}
+const prepImg = img => {
+    // Resolve url
+    img.forEach(x => x.url = x.url ? new URL(x.url, BASE_URL).toString() : null);
+    // Sort
+    return img.sort((a, b) => b.width - a.width);
+};
+
+
+const exposedMiniget = (url, options = {}, requestOptionsOverwrite) => {
+    const req = miniget(url, requestOptionsOverwrite || options.requestOptions);
+    if (typeof options.requestCallback === 'function') options.requestCallback(req);
+    return req;
+};
 const setDownloadURL = (format, sig) => {
     let decodedUrl;
     if (format.url) {
@@ -196,7 +608,6 @@ const setDownloadURL = (format, sig) => {
 
     format.url = parsedUrl.toString();
 };
-
 const decipherFormats = async (formats, video_id) => {
     let decipheredFormats = [];
     // let embed = await axios({
@@ -246,7 +657,6 @@ const getTokens = (body) => {
     }
     return tokens;
 };
-
 const getHTML5player = body => {
     let html5playerRes =
         /<script\s+src="([^"]+)"(?:\s+type="text\/javascript")?\s+name="player_ias\/base"\s*>|"jsUrl":"([^"]+)"/
@@ -415,6 +825,12 @@ function utf8_from_str(s) {
     }
     return a
 }
+
 module.exports = ytaudio;
+
 ytaudio.getPlayerdata = getPlayerdata;
 ytaudio.getRelatedVideos = getRelatedVideos;
+ytaudio.getChannelInfos = getChannelInfos;
+ytaudio.getChannelPlaylists = getChannelPlaylists;
+ytaudio.getPlaylist = getPlaylist;
+ytaudio.getSearchResults = getSearchResults;
