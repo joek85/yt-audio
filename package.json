@@ -9,7 +9,6 @@
   "author": "Joe Kaikaty",
   "license": "ISC",
   "dependencies": {
-    "axios": "^0.23.0",
-    "miniget": "^4.2.1"
+    "axios": "^0.23.0"
   }
 }
