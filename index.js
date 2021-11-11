@@ -1,4 +1,4 @@
-import axios, { post } from 'axios';
+import axios from 'axios';
 
 const PLAYER_URL = 'https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
 const RELATED_URL = 'https://www.youtube.com/youtubei/v1/next?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
@@ -36,7 +36,7 @@ const getSearchResults = async (searchQuery) => {
 const getPlayerdata = async (videoId) => {
     let data = { context: context, videoId: videoId };
     try {
-        const response = await post(PLAYER_URL, data, {
+        const response = await axios.post(PLAYER_URL, data, {
             headers: {
                 'content-type': 'application/json',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.101 Safari/537.36',
