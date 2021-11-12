@@ -23,7 +23,7 @@ const ytaudio = () => {
 const getSearchResults = async (searchQuery) => {
     let data = { context: context, query: searchQuery };
     try {
-        const response = await post(SEARCH_URL, data, {
+        const response = await axios.post(SEARCH_URL, data, {
             headers: { 'content-type': 'application/json' }
         });
         return parseSearchResults(response.data)
@@ -419,9 +419,10 @@ const parseRelatedVideos = (data) => {
             let playlistRenderer = result.compactPlaylistRenderer;
             if (playlistRenderer) {
                 let playlist = {
-                    type: 'plalist',
+                    type: 'playlist',
                     id: playlistRenderer.playlistId,
                     title: playlistRenderer.title.simpleText,
+                    subtitle: playlistRenderer.shortBylineText.runs[0].text,
                     thumbnail: prepImg(playlistRenderer.thumbnail.thumbnails)[0],
                     published: playlistRenderer.publishedTimeText ? playlistRenderer.publishedTimeText.simpleText : '',
                     count: playlistRenderer.videoCountShortText.simpleText

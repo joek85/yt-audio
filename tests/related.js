@@ -1,6 +1,6 @@
 import ytaudio from "../index.js";
 
-const videoId = 'U3SPkP4y-rY'
+const videoId = 'D76nTdQ1A-0'
 let related = await ytaudio.getRelatedVideos(videoId);
 
 console.log(related)
