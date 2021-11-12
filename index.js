@@ -68,7 +68,7 @@ const getVideoDetails = async (data) => {
 const getChannelInfos = async (channelId) => {
     let data = { context: context, browseId: channelId };
     try {
-        const response = await post(CHANNEL_URL, data);
+        const response = await axios.post(CHANNEL_URL, data);
         return parseChannelInfos(response.data)
     } catch (err) {
         return err
@@ -82,7 +82,7 @@ const getChannelPlaylists = async (channelId, clickTrackingParams, params) => {
         params: params,
     };
     try {
-        const response = await post(CHANNEL_URL, data);
+        const response = await axios.post(CHANNEL_URL, data);
         return parseChannelPlaylists(response.data)
     } catch (err) {
         return err
@@ -114,7 +114,7 @@ const getPlaylist = async (browseId, clickTrackingParams) => {
         clickTracking: { clickTrackingParams: clickTrackingParams },
     };
     try {
-        const response = await post(CHANNEL_URL, data);
+        const response = await axios.post(CHANNEL_URL, data);
         return parsePlaylist(response.data)
     } catch (err) {
         return err
