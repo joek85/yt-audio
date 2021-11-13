@@ -32,7 +32,6 @@ const getSearchResults = async (searchQuery) => {
         return err
     }
 };
-
 const getPlayerdata = async (videoId) => {
     let data = { context: context, videoId: videoId };
     try {
@@ -84,6 +83,21 @@ const getChannelPlaylists = async (channelId, clickTrackingParams, params) => {
     try {
         const response = await axios.post(CHANNEL_URL, data);
         return parseChannelPlaylists(response.data)
+    } catch (err) {
+        return err
+    }
+};
+const getChannelVideos = async (channelId, clickTrackingParams, params) => {
+    let data = {
+        context: context,
+        browseId: channelId,
+        clickTracking: { clickTrackingParams: clickTrackingParams },
+        params: params,
+    };
+    try {
+        const response = await axios.post(CHANNEL_URL, data);
+        // console.log(response.data)
+        return parseChannelVideos(response.data)
     } catch (err) {
         return err
     }
@@ -220,15 +234,7 @@ const parseChannelInfos = (data) => {
                                         for (let video of SectionRenderer.shelfRenderer.content.horizontalListRenderer.items) {
                                             if (video.gridVideoRenderer) {
                                                 videos.type = 'videos';
-                                                videos.items.push({
-                                                    videoId: video.gridVideoRenderer.videoId,
-                                                    thumbnails: prepImg(video.gridVideoRenderer.thumbnail.thumbnails)[0],
-                                                    title: video.gridVideoRenderer.title.simpleText,
-                                                    published: video.gridVideoRenderer.publishedTimeText ? video.gridVideoRenderer.publishedTimeText.simpleText : '',
-                                                    views: video.gridVideoRenderer.shortViewCountText ? video.gridVideoRenderer.shortViewCountText.simpleText : '',
-                                                    subtitle: video.gridVideoRenderer.shortBylineText ? video.gridVideoRenderer.shortBylineText.runs[0].text : '',
-                                                    duration: video.gridVideoRenderer.thumbnailOverlays[0].thumbnailOverlayTimeStatusRenderer.text.simpleText
-                                                })
+                                                videos.items.push(parseGridVideoRenderer(video.gridVideoRenderer))
                                             } else if (video.gridPlaylistRenderer) {
                                                 videos.type = 'playlists';
                                                 videos.items.push(parsePlaylists(video))
@@ -270,7 +276,7 @@ const parseChannelInfos = (data) => {
                                                 videos.items.push({
                                                     channelId: video.channelRenderer.channelId,
                                                     thumbnails: prepImg(video.channelRenderer.thumbnail.thumbnails)[0],
-                                                    videoCounts: video.channelRenderer.videoCountText.runs[0].text,
+                                                    videoCounts: video.channelRenderer.videoCountText ? video.channelRenderer.videoCountText.runs[0].text : '',
                                                     subscribers: video.channelRenderer.subscriberCountText ? video.channelRenderer.subscriberCountText.simpleText : '',
                                                     title: video.channelRenderer.title.simpleText
                                                 })
@@ -356,6 +362,27 @@ const parseChannelPlaylists = (data) => {
         }
     }
     return playlists
+};
+const parseChannelVideos = (data) => {
+    let tabs = data.contents.twoColumnBrowseResultsRenderer.tabs;
+    let contents = tabs[1].tabRenderer.content.sectionListRenderer.contents;
+    let renderers = contents[0].itemSectionRenderer.contents[0];
+    let items = renderers.gridRenderer.items;
+   
+    let videos = {videos: [], continuation: '' };
+    for (let video of items) {
+        if (video.gridVideoRenderer) {
+            videos.videos.push(parseGridVideoRenderer(video.gridVideoRenderer))
+        }else if (video.continuationItemRenderer) {
+            let Token = video.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+            let ctp = video.continuationItemRenderer.continuationEndpoint.clickTrackingParams;
+            videos.continuation = {
+                Token: Token,
+                ctp: ctp
+            }
+        }
+    }
+    return videos
 };
 const parseRelatedVideos = (data) => {
     let secondaryResults;
@@ -618,7 +645,17 @@ const parseCards = (renderer) => {
         searchRefinments: searchRefinments
     }
 };
-
+const parseGridVideoRenderer = (renderer) => {
+    // console.log(renderer)
+    return {
+        videoId: renderer.videoId,
+        thumbnails: prepImg(renderer.thumbnail.thumbnails)[0],
+        title: (renderer.title.simpleText || renderer.title.runs[0].text),
+        published: renderer.publishedTimeText ? renderer.publishedTimeText.simpleText : '',
+        views: renderer.shortViewCountText ? renderer.shortViewCountText.simpleText : '',
+        duration: renderer.thumbnailOverlays[0].thumbnailOverlayTimeStatusRenderer.text.simpleText
+    }
+};
 const findKey = (obj, key) => {
     for (let [k, v] of Object.entries(obj)) {
         if (k === key) return v;
@@ -639,5 +676,6 @@ ytaudio.getPlayerdata = getPlayerdata;
 ytaudio.getRelatedVideos = getRelatedVideos;
 ytaudio.getChannelInfos = getChannelInfos;
 ytaudio.getChannelPlaylists = getChannelPlaylists;
+ytaudio.getChannelVideos = getChannelVideos;
 ytaudio.getPlaylist = getPlaylist;
 ytaudio.getSearchResults = getSearchResults;
