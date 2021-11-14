@@ -368,12 +368,12 @@ const parseChannelVideos = (data) => {
     let contents = tabs[1].tabRenderer.content.sectionListRenderer.contents;
     let renderers = contents[0].itemSectionRenderer.contents[0];
     let items = renderers.gridRenderer.items;
-   
-    let videos = {videos: [], continuation: '' };
+
+    let videos = { videos: [], continuation: '' };
     for (let video of items) {
         if (video.gridVideoRenderer) {
             videos.videos.push(parseGridVideoRenderer(video.gridVideoRenderer))
-        }else if (video.continuationItemRenderer) {
+        } else if (video.continuationItemRenderer) {
             let Token = video.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
             let ctp = video.continuationItemRenderer.continuationEndpoint.clickTrackingParams;
             videos.continuation = {
@@ -646,7 +646,6 @@ const parseCards = (renderer) => {
     }
 };
 const parseGridVideoRenderer = (renderer) => {
-    // console.log(renderer)
     return {
         videoId: renderer.videoId,
         thumbnails: prepImg(renderer.thumbnail.thumbnails)[0],

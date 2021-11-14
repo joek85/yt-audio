@@ -1,6 +1,6 @@
 import ytaudio from "../index.js";
 
-let channelId = 'UC14ap4T608Zz_Mz4eezhIqw';
+let channelId = 'UCV-iSZdmPWV9pq-t-dlYzQg';
 
 let videos = await ytaudio.getChannelInfos(channelId);
 
