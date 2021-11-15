@@ -1,4 +1,5 @@
-import axios from 'axios';
+import fetch from 'node-fetch';
+import https from 'https'
 
 const PLAYER_URL = 'https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
 const RELATED_URL = 'https://www.youtube.com/youtubei/v1/next?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
@@ -17,37 +18,96 @@ const DEFAULT_CONTEXT = {
 
 const context = JSON.parse(JSON.stringify(DEFAULT_CONTEXT));
 
-const ytaudio = () => {
-
-};
-const getSearchResults = async (searchQuery) => {
+export const getSearchResults = async (searchQuery) => {
     let data = { context: context, query: searchQuery };
     try {
-        const response = await axios.post(SEARCH_URL, data, {
-            headers: { 'content-type': 'application/json' }
-        });
-        return parseSearchResults(response.data)
+        const search = await post(SEARCH_URL, data);
+        return parseSearchResults(search)
     } catch (err) {
         console.log(err);
         return err
     }
 };
-const getPlayerdata = async (videoId) => {
+export const getPlayerdata = async (videoId) => {
     let data = { context: context, videoId: videoId };
     try {
-        const response = await axios.post(PLAYER_URL, data, {
-            headers: {
-                'content-type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.101 Safari/537.36',
-            }
-        });
-        return getVideoDetails(response.data)
+        const details = await post(PLAYER_URL, data);
+        return parseVideoDetails(details)
     } catch (err) {
         console.log(err);
         return err
     }
 };
-const getVideoDetails = async (data) => {
+export const getChannelInfos = async (channelId) => {
+    let data = { context: context, browseId: channelId };
+    try {
+        const infos = await post(CHANNEL_URL, data)
+        return parseChannelInfos(infos)
+    } catch (err) {
+        return err
+    }
+};
+export const getChannelPlaylists = async (channelId, clickTrackingParams, params) => {
+    let data = {
+        context: context,
+        browseId: channelId,
+        clickTracking: { clickTrackingParams: clickTrackingParams },
+        params: params,
+    };
+    try {
+        const playlists = await post(CHANNEL_URL, data);
+        return parseChannelPlaylists(playlists)
+    } catch (err) {
+        return err
+    }
+};
+export const getChannelVideos = async (channelId, clickTrackingParams, params) => {
+    let data = {
+        context: context,
+        browseId: channelId,
+        clickTracking: { clickTrackingParams: clickTrackingParams },
+        params: params,
+    };
+    try {
+        const videos = await post(CHANNEL_URL, data);
+        return parseChannelVideos(videos)
+    } catch (err) {
+        return err
+    }
+};
+export const getRelatedVideos = async (videoId, continuation, tracking) => {
+    let data = {
+        context: context,
+        videoId: videoId,
+        continuation: continuation,
+        clickTracking: { clickTrackingParams: tracking }
+    };
+
+    try {
+        const related = await post(RELATED_URL, data);
+        return parseRelatedVideos(related);
+    } catch (err) {
+        console.log(err)
+        return err
+    }
+};
+export const getPlaylist = async (browseId, clickTrackingParams) => {
+    let data = {
+        context: context,
+        browseId: 'VL' + browseId,
+        clickTracking: { clickTrackingParams: clickTrackingParams },
+    };
+    try {
+        const playlist = await post(CHANNEL_URL, data)
+        return parsePlaylist(playlist)
+    } catch (err) {
+        return err
+    }
+};
+
+
+
+const parseVideoDetails = async (data) => {
     let videoDetails = {};
     videoDetails.videoId = data.videoDetails.videoId;
     videoDetails.thumbnails = data.videoDetails.thumbnail.thumbnails;
@@ -64,100 +124,27 @@ const getVideoDetails = async (data) => {
 
     return videoDetails;
 };
-const getChannelInfos = async (channelId) => {
-    let data = { context: context, browseId: channelId };
-    try {
-        const response = await axios.post(CHANNEL_URL, data);
-        return parseChannelInfos(response.data)
-    } catch (err) {
-        return err
-    }
-};
-const getChannelPlaylists = async (channelId, clickTrackingParams, params) => {
-    let data = {
-        context: context,
-        browseId: channelId,
-        clickTracking: { clickTrackingParams: clickTrackingParams },
-        params: params,
-    };
-    try {
-        const response = await axios.post(CHANNEL_URL, data);
-        return parseChannelPlaylists(response.data)
-    } catch (err) {
-        return err
-    }
-};
-const getChannelVideos = async (channelId, clickTrackingParams, params) => {
-    let data = {
-        context: context,
-        browseId: channelId,
-        clickTracking: { clickTrackingParams: clickTrackingParams },
-        params: params,
-    };
-    try {
-        const response = await axios.post(CHANNEL_URL, data);
-        // console.log(response.data)
-        return parseChannelVideos(response.data)
-    } catch (err) {
-        return err
-    }
-};
-const getRelatedVideos = async (videoId, continuation, tracking) => {
-    try {
-        const response = await axios({
-            method: 'post',
-            url: RELATED_URL,
-            headers: { 'content-type': 'application/json' },
-            data: {
-                context: context,
-                videoId: videoId,
-                continuation: continuation,
-                clickTracking: { clickTrackingParams: tracking }
-            }
-        });
-        return parseRelatedVideos(response.data);
-    } catch (err) {
-        console.log(err)
-        return err
-    }
-};
-const getPlaylist = async (browseId, clickTrackingParams) => {
-    let data = {
-        context: context,
-        browseId: browseId,
-        clickTracking: { clickTrackingParams: clickTrackingParams },
-    };
-    try {
-        const response = await axios.post(CHANNEL_URL, data);
-        return parsePlaylist(response.data)
-    } catch (err) {
-        return err
-    }
-};
-
 const parsePlaylist = (data) => {
     let playlist = { sidebar: {}, videos: [] };
     let sidebar = data.sidebar.playlistSidebarRenderer.items[0].playlistSidebarPrimaryInfoRenderer;
     playlist.sidebar = {
-        thumnails: sidebar.thumbnailRenderer.playlistVideoThumbnailRenderer.thumbnail.thumbnails,
+        thumbnails: prepImg(sidebar.thumbnailRenderer.playlistVideoThumbnailRenderer.thumbnail.thumbnails)[0],
         title: sidebar.title.runs[0].text,
-        videoCounts: sidebar.stats[0].runs[0].text + sidebar.stats[0].runs[1].text,
+        videoCounts: sidebar.stats[0].runs.map(text => {return text.text}).join(""),
         views: sidebar.stats[1].simpleText,
         published: sidebar.stats[2].runs[0].text + sidebar.stats[2].runs[1].text
     };
 
     let tab = data.contents.twoColumnBrowseResultsRenderer.tabs[0];
-    let contents = tab.tabRenderer.content.sectionListRenderer.contents;
+    let contents = tab.tabRenderer.content.sectionListRenderer.contents[0];
     let renderers = contents.itemSectionRenderer.contents[0].playlistVideoListRenderer;
-    for (video of renderers.contents) {
+    for (let video of renderers.contents) {
         playlist.videos.push({
-            videoId: video.videoRenderer.videoId,
-            thumbnails: prepImg(video.videoRenderer.thumbnail.thumbnails)[0],
-            title: video.videoRenderer.title.simpleText,
-            published: video.videoRenderer.publishedTimeText ? video.videoRenderer.publishedTimeText.simpleText : '',
-            views: video.videoRenderer.shortViewCountText.simpleText,
-            subtitle: video.videoRenderer.shortBylineText ? video.videoRenderer.shortBylineText.runs[0].text : '',
-            duration: video.videoRenderer.lengthText.simpleText
+            videoId: video.playlistVideoRenderer.videoId,
+            thumbnails: prepImg(video.playlistVideoRenderer.thumbnail.thumbnails)[0],
+            title: video.playlistVideoRenderer.title.runs[0].text,
+            subtitle: video.playlistVideoRenderer.shortBylineText ? video.playlistVideoRenderer.shortBylineText.runs[0].text : '',
+            duration: video.playlistVideoRenderer.lengthText.simpleText
         })
     }
 
@@ -669,12 +656,62 @@ const prepImg = img => {
     return img.sort((a, b) => b.width - a.width);
 };
 
-export default ytaudio;
+async function post(url, data) {
+    const dataString = JSON.stringify(data)
 
-ytaudio.getPlayerdata = getPlayerdata;
-ytaudio.getRelatedVideos = getRelatedVideos;
-ytaudio.getChannelInfos = getChannelInfos;
-ytaudio.getChannelPlaylists = getChannelPlaylists;
-ytaudio.getChannelVideos = getChannelVideos;
-ytaudio.getPlaylist = getPlaylist;
-ytaudio.getSearchResults = getSearchResults;
+    const options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': dataString.length,
+        },
+        timeout: 0,
+    }
+
+    // return new Promise((resolve, reject) => {
+    //     const req = https.request(url, options, (res) => {
+    //         if (res.statusCode < 200 || res.statusCode > 299) {
+    //             return reject(new Error(`HTTP status code ${res.statusCode}`))
+    //         }
+
+    //         const body = []
+    //         res.on('data', (chunk) => body.push(chunk))
+    //         res.on('end', () => {
+    //             const resString = Buffer.concat(body).toString()
+    //             resolve(resString)
+    //         })
+    //     })
+
+    //     req.on('error', (err) => {
+    //         reject(err)
+    //     })
+
+    //     req.on('timeout', () => {
+    //         req.destroy()
+    //         reject(new Error('Request time out'))
+    //     })
+
+    //     req.write(dataString)
+    //     req.end()
+    // })
+
+    let response = await fetch(url, {
+        body: dataString,
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': dataString.length
+        },
+        method: 'post'
+    })
+    return await response.json()
+}
+export default {
+    getPlayerdata,
+    getRelatedVideos,
+    getChannelInfos,
+    getChannelPlaylists,
+    getChannelVideos,
+    getPlaylist,
+    getSearchResults
+}
+

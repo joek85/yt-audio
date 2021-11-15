@@ -2,7 +2,7 @@
   "name": "yt-audio",
   "version": "1.0.0",
   "description": "YouTube audio",
-  "main": "index.js",
+  "main": "index",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,6 +10,6 @@
   "author": "Joe Kaikaty",
   "license": "ISC",
   "dependencies": {
-    "axios": "^0.23.0"
+    "node-fetch": "^2.6.6"
   }
 }
