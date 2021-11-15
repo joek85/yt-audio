@@ -126,8 +126,10 @@ const parseVideoDetails = async (data) => {
 const parsePlaylist = (data) => {
     let playlist = { sidebar: {}, videos: [] };
     let sidebar = data.sidebar.playlistSidebarRenderer.items[0].playlistSidebarPrimaryInfoRenderer;
+    console.log(sidebar.thumbnailRenderer)
+    let renderer = sidebar.thumbnailRenderer.playlistVideoThumbnailRenderer || sidebar.thumbnailRenderer.playlistCustomThumbnailRenderer
     playlist.sidebar = {
-        thumbnails: prepImg(sidebar.thumbnailRenderer.playlistVideoThumbnailRenderer.thumbnail.thumbnails)[0],
+        thumbnails: prepImg(renderer.thumbnail.thumbnails)[0],
         title: sidebar.title.runs[0].text,
         videoCounts: sidebar.stats[0].runs.map(text => {return text.text}).join(""),
         views: sidebar.stats[1].simpleText,
