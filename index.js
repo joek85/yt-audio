@@ -126,14 +126,13 @@ const parseVideoDetails = async (data) => {
 const parsePlaylist = (data) => {
     let playlist = { sidebar: {}, videos: [] };
     let sidebar = data.sidebar.playlistSidebarRenderer.items[0].playlistSidebarPrimaryInfoRenderer;
-    console.log(sidebar.thumbnailRenderer)
     let renderer = sidebar.thumbnailRenderer.playlistVideoThumbnailRenderer || sidebar.thumbnailRenderer.playlistCustomThumbnailRenderer
     playlist.sidebar = {
         thumbnails: prepImg(renderer.thumbnail.thumbnails)[0],
         title: sidebar.title.runs[0].text,
         videoCounts: sidebar.stats[0].runs.map(text => {return text.text}).join(""),
         views: sidebar.stats[1].simpleText,
-        published: sidebar.stats[2].runs[0].text + sidebar.stats[2].runs[1].text
+        published: sidebar.stats[2].runs.map(text => {return text.text}).join("")
     };
 
     let tab = data.contents.twoColumnBrowseResultsRenderer.tabs[0];
@@ -523,7 +522,7 @@ const parseSecondaryContents = (renderer) => {
         header = {
             title: container.header.watchCardRichHeaderRenderer.title.simpleText,
             subtitle: container.header.watchCardRichHeaderRenderer.subtitle.simpleText,
-            avatar: container.header.watchCardRichHeaderRenderer ? prepImg(container.header.watchCardRichHeaderRenderer.avatar.thumbnails)[0] : '',
+            avatar: container.header.watchCardRichHeaderRenderer.avatar ? prepImg(container.header.watchCardRichHeaderRenderer.avatar.thumbnails)[0] : '',
         };
         action = {
             title: container.callToAction.watchCardHeroVideoRenderer.title ? container.callToAction.watchCardHeroVideoRenderer.title.simpleText : '',
