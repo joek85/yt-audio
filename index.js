@@ -31,7 +31,7 @@ export const getPlayerdata = async (videoId) => {
     let data = { context: context, videoId: videoId };
     try {
         const details = await post(PLAYER_URL, data);
-        return parseVideoDetails(details)
+        return (details)
     } catch (err) {
         console.log(err);
         return err
@@ -108,6 +108,7 @@ export const getPlaylist = async (browseId, clickTrackingParams) => {
 
 const parseVideoDetails = async (data) => {
     let videoDetails = {};
+
     videoDetails.videoId = data.videoDetails.videoId;
     videoDetails.thumbnails = data.videoDetails.thumbnail.thumbnails;
     videoDetails.title = data.videoDetails.title;
@@ -130,24 +131,25 @@ const parsePlaylist = (data) => {
     playlist.sidebar = {
         thumbnails: prepImg(renderer.thumbnail.thumbnails)[0],
         title: sidebar.title.runs[0].text,
-        videoCounts: sidebar.stats[0].runs.map(text => {return text.text}).join(""),
+        videoCounts: sidebar.stats[0].runs.map(text => { return text.text }).join(""),
         views: sidebar.stats[1].simpleText,
-        published: sidebar.stats[2].runs.map(text => {return text.text}).join("")
+        published: sidebar.stats[2].runs.map(text => { return text.text }).join("")
     };
 
     let tab = data.contents.twoColumnBrowseResultsRenderer.tabs[0];
     let contents = tab.tabRenderer.content.sectionListRenderer.contents[0];
     let renderers = contents.itemSectionRenderer.contents[0].playlistVideoListRenderer;
     for (let video of renderers.contents) {
-        playlist.videos.push({
-            videoId: video.playlistVideoRenderer.videoId,
-            thumbnails: prepImg(video.playlistVideoRenderer.thumbnail.thumbnails)[0],
-            title: video.playlistVideoRenderer.title.runs[0].text,
-            subtitle: video.playlistVideoRenderer.shortBylineText ? video.playlistVideoRenderer.shortBylineText.runs[0].text : '',
-            duration: video.playlistVideoRenderer.lengthText.simpleText
-        })
+        if (video.playlistVideoRenderer) {
+            playlist.videos.push({
+                videoId: video.playlistVideoRenderer.videoId,
+                thumbnails: prepImg(video.playlistVideoRenderer.thumbnail.thumbnails)[0],
+                title: video.playlistVideoRenderer.title.runs[0].text,
+                subtitle: video.playlistVideoRenderer.shortBylineText ? video.playlistVideoRenderer.shortBylineText.runs[0].text : '',
+                duration: video.playlistVideoRenderer.lengthText.simpleText
+            })
+        }
     }
-
     return playlist;
 };
 const parsePlaylists = (playlist) => {
@@ -462,7 +464,7 @@ const parseSearchResults = (data) => {
 
     let contents = findKey(primaryContents, 'sectionListRenderer').contents;
     let itemSectionRenderer = contents[0].itemSectionRenderer.contents;
-    let continuationItemRenderer = contents[1].continuationItemRenderer;
+    let continuationItemRenderer = contents[1] ? contents[1].continuationItemRenderer : null;
     if (continuationItemRenderer) {
         continuation = {
             clickTrackingParams: continuationItemRenderer.continuationEndpoint.clickTrackingParams,
