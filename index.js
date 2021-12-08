@@ -1,12 +1,13 @@
 import fetch from 'node-fetch';
 
-const PLAYER_URL = 'https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
-const RELATED_URL = 'https://www.youtube.com/youtubei/v1/next?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
-const CHANNEL_URL = 'https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
-const SEARCH_URL = 'https://www.youtube.com/youtubei/v1/search?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const PLAYER_API = 'https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const RELATED_API = 'https://www.youtube.com/youtubei/v1/next?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const CHANNEL_API = 'https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const SEARCH_API = 'https://www.youtube.com/youtubei/v1/search?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
 
 const BASE_URL = 'https://www.youtube.com/watch?v=';
 const EMBED_URL = 'https://www.youtube.com/embed/';
+const SEARCH_URL = 'https://www.youtube.com/results?gl=US&hl=en&search_query='
 
 const DEFAULT_CONTEXT = {
     client: {
@@ -17,11 +18,28 @@ const DEFAULT_CONTEXT = {
 
 const context = JSON.parse(JSON.stringify(DEFAULT_CONTEXT));
 
-export const getSearchResults = async (searchQuery) => {
-    let data = { context: context, query: searchQuery };
+export const getSearchResults = async (searchQuery, params, continuation) => {
     try {
-        const search = await post(SEARCH_URL, data);
-        return parseSearchResults(search)
+        if (continuation.token) {
+            console.log(continuation)
+            let data = {
+                context: context, query: searchQuery, continuation: continuation.token,
+                clickTracking: { clickTrackingParams: continuation.clickTrackingParams }
+            };
+            const search = await post(SEARCH_API, data);
+            return parseSearchResults(search)
+        } else {
+            const response = await fetch(SEARCH_URL + searchQuery + '&sp=' + params, {
+                method: 'GET',
+            })
+            let data = await response.text();
+            let pos = data.indexOf('var ytInitialData = ')
+            let ytInitialData = data.slice(pos + 'var ytInitialData = '.length)
+            let posEnd = ytInitialData.indexOf(';</script>')
+            let results = data.slice(pos + 'var ytInitialData = '.length, pos + 'var ytInitialData = '.length + posEnd)
+            return parseSearchResults(JSON.parse(results))
+        }
+
     } catch (err) {
         console.log(err);
         return err
@@ -30,7 +48,7 @@ export const getSearchResults = async (searchQuery) => {
 export const getPlayerdata = async (videoId) => {
     let data = { context: context, videoId: videoId };
     try {
-        const details = await post(PLAYER_URL, data);
+        const details = await post(PLAYER_API, data);
         return (details)
     } catch (err) {
         console.log(err);
@@ -40,7 +58,7 @@ export const getPlayerdata = async (videoId) => {
 export const getChannelInfos = async (channelId) => {
     let data = { context: context, browseId: channelId };
     try {
-        const infos = await post(CHANNEL_URL, data)
+        const infos = await post(CHANNEL_API, data)
         return parseChannelInfos(infos)
     } catch (err) {
         return err
@@ -54,7 +72,7 @@ export const getChannelPlaylists = async (channelId, clickTrackingParams, params
         params: params,
     };
     try {
-        const playlists = await post(CHANNEL_URL, data);
+        const playlists = await post(CHANNEL_API, data);
         return parseChannelPlaylists(playlists)
     } catch (err) {
         return err
@@ -68,7 +86,7 @@ export const getChannelVideos = async (channelId, clickTrackingParams, params) =
         params: params,
     };
     try {
-        const videos = await post(CHANNEL_URL, data);
+        const videos = await post(CHANNEL_API, data);
         return parseChannelVideos(videos)
     } catch (err) {
         return err
@@ -83,7 +101,7 @@ export const getRelatedVideos = async (videoId, continuation, tracking) => {
     };
 
     try {
-        const related = await post(RELATED_URL, data);
+        const related = await post(RELATED_API, data);
         return parseRelatedVideos(related);
     } catch (err) {
         console.log(err)
@@ -97,7 +115,7 @@ export const getPlaylist = async (browseId, clickTrackingParams) => {
         clickTracking: { clickTrackingParams: clickTrackingParams },
     };
     try {
-        const playlist = await post(CHANNEL_URL, data)
+        const playlist = await post(CHANNEL_API, data)
         return parsePlaylist(playlist)
     } catch (err) {
         return err
@@ -417,7 +435,7 @@ const parseRelatedVideos = (data) => {
                     id: channelId,
                     name,
                     user,
-                    channel_url: `https://www.youtube.com/channel/${channelId}`,
+                    CHANNEL_API: `https://www.youtube.com/channel/${channelId}`,
                     user_url: `https://www.youtube.com/user/${user}`,
                     thumbnails: prepImg(details.channelThumbnail.thumbnails)[0],
                 },
@@ -453,65 +471,138 @@ const parseRelatedVideos = (data) => {
     return related
 };
 const parseSearchResults = (data) => {
-    let estimatedResults = data.estimatedResults;
-    let refinements = data.refinements;
-    let primaryContents = data.contents.twoColumnSearchResultsRenderer.primaryContents;
-    let secondaryContents = data.contents.twoColumnSearchResultsRenderer.secondaryContents;
     let continuation = {};
-
+    let searchFilters = []
     let primaryResults = [];
     let secondaryResults;
 
-    let contents = findKey(primaryContents, 'sectionListRenderer').contents;
-    let itemSectionRenderer = contents[0].itemSectionRenderer.contents;
-    let continuationItemRenderer = contents[1] ? contents[1].continuationItemRenderer : null;
-    if (continuationItemRenderer) {
-        continuation = {
-            clickTrackingParams: continuationItemRenderer.continuationEndpoint.clickTrackingParams,
-            token: continuationItemRenderer.continuationEndpoint.continuationCommand.token
-        }
-    }
-    if (itemSectionRenderer) {
-        for (let i of itemSectionRenderer) {
-            switch (Object.keys(i)[0]) {
-                case 'videoRenderer':
-                    primaryResults.push({
-                        type: 'video',
-                        items: parseVideoRenderer(i.videoRenderer)
-                    });
-                    break;
-                case 'channelRenderer':
-                    primaryResults.push({
-                        type: 'channel',
-                        items: parseChannelRenderer(i.channelRenderer)
-                    });
-                    break;
-                case 'shelfRenderer':
-                    primaryResults.push({
-                        type: 'shelf',
-                        items: parseShelfRenderer(i.shelfRenderer)
-                    });
-                    break;
-                case 'horizontalCardListRenderer':
-                    primaryResults.push({
-                        type: 'cards',
-                        items: parseCards(i.horizontalCardListRenderer)
-                    });
-                    break;
+    if (data.contents) {
+        let estimatedResults = data.estimatedResults;
+        let refinements = data.refinements;
+        let primaryContents = data.contents.twoColumnSearchResultsRenderer.primaryContents;
+        let secondaryContents = data.contents.twoColumnSearchResultsRenderer.secondaryContents;
+
+        let subMenu = primaryContents.sectionListRenderer.subMenu;
+        let contents = findKey(primaryContents, 'sectionListRenderer').contents;
+        let itemSectionRenderer = contents[0].itemSectionRenderer.contents;
+        let continuationItemRenderer = contents[1] ? contents[1].continuationItemRenderer : null;
+
+        if (continuationItemRenderer) {
+            continuation = {
+                clickTrackingParams: continuationItemRenderer.continuationEndpoint.clickTrackingParams,
+                token: continuationItemRenderer.continuationEndpoint.continuationCommand.token
             }
+        }
+
+        if (itemSectionRenderer) {
+            for (let i of itemSectionRenderer) {
+                switch (Object.keys(i)[0]) {
+                    case 'videoRenderer':
+                        primaryResults.push({
+                            type: 'video',
+                            items: parseVideoRenderer(i.videoRenderer)
+                        });
+                        break;
+                    case 'channelRenderer':
+                        primaryResults.push({
+                            type: 'channel',
+                            items: parseChannelRenderer(i.channelRenderer)
+                        });
+                        break;
+                    case 'shelfRenderer':
+                        primaryResults.push({
+                            type: 'shelf',
+                            items: parseShelfRenderer(i.shelfRenderer)
+                        });
+                        break;
+                    case 'horizontalCardListRenderer':
+                        primaryResults.push({
+                            type: 'cards',
+                            items: parseCards(i.horizontalCardListRenderer)
+                        });
+                        break;
+                }
+            }
+        }
+        if (subMenu) {
+            let groups = subMenu.searchSubMenuRenderer.groups;
+
+            for (const searchFilter of groups) {
+                let groupRenderer = searchFilter.searchFilterGroupRenderer;
+                let searchTitle = groupRenderer.title.simpleText;
+                let filters = [];
+                for (const filter of groupRenderer.filters) {
+                    let navigationEndpoint = filter.searchFilterRenderer.navigationEndpoint;
+                    if (navigationEndpoint) {
+                        filters.push({ title: filter.searchFilterRenderer.label.simpleText, params: navigationEndpoint.searchEndpoint.params })
+                    }
+                }
+                searchFilters.push({
+                    title: searchTitle,
+                    filters: filters
+                })
+            }
+        }
+
+        if (secondaryContents) {
+            secondaryResults = parseSecondaryContents(secondaryContents);
+        }
+        return {
+            primaryResults: primaryResults,
+            secondaryResults: secondaryResults,
+            continuation: continuation,
+            estimatedResults: estimatedResults,
+            refinements: refinements,
+            searchFilters: searchFilters
+        }
+    } else {
+        let primaryContents = data.onResponseReceivedCommands[0].appendContinuationItemsAction.continuationItems
+        let contents = findKey(primaryContents[0], 'itemSectionRenderer').contents;
+        let continuationItemRenderer = primaryContents[1] ? primaryContents[1].continuationItemRenderer : null;
+
+        if (continuationItemRenderer) {
+            continuation = {
+                clickTrackingParams: continuationItemRenderer.continuationEndpoint.clickTrackingParams,
+                token: continuationItemRenderer.continuationEndpoint.continuationCommand.token
+            }
+        }
+        if (contents) {
+            for (let i of contents) {
+                switch (Object.keys(i)[0]) {
+                    case 'videoRenderer':
+                        primaryResults.push({
+                            type: 'video',
+                            items: parseVideoRenderer(i.videoRenderer)
+                        });
+                        break;
+                    case 'channelRenderer':
+                        primaryResults.push({
+                            type: 'channel',
+                            items: parseChannelRenderer(i.channelRenderer)
+                        });
+                        break;
+                    case 'shelfRenderer':
+                        primaryResults.push({
+                            type: 'shelf',
+                            items: parseShelfRenderer(i.shelfRenderer)
+                        });
+                        break;
+                    case 'horizontalCardListRenderer':
+                        primaryResults.push({
+                            type: 'cards',
+                            items: parseCards(i.horizontalCardListRenderer)
+                        });
+                        break;
+                }
+            }
+        }
+
+        return {
+            primaryResults: primaryResults,
+            continuation: continuation,
         }
     }
 
-    if (secondaryContents) {
-        secondaryResults = parseSecondaryContents(secondaryContents);
-    }
-    return {
-        primaryResults: primaryResults,
-        secondaryResults: secondaryResults,
-        continuation: continuation,
-        estimatedResults: estimatedResults,
-        refinements: refinements
-    }
 };
 const parseSecondaryContents = (renderer) => {
     let secondaryContents = renderer.secondarySearchContainerRenderer.contents[0];
@@ -604,7 +695,7 @@ const parseChannelRenderer = (renderer) => {
         channelId: renderer.channelId,
         title: renderer.title.simpleText,
         thumbnail: prepImg(renderer.thumbnail.thumbnails)[0],
-        videoCounts: renderer.videoCountText.runs[0].text + renderer.videoCountText.runs[1].text,
+        videoCounts: renderer.videoCountText ? renderer.videoCountText.runs.map(text => { return text.text }).join("") : '',
         description: renderer.descriptionSnippet ? renderer.descriptionSnippet.runs[0].text : '',
         subscribers: renderer.subscriberCountText ? renderer.subscriberCountText.simpleText : ''
     }
@@ -660,43 +751,6 @@ const prepImg = img => {
 
 async function post(url, data) {
     const dataString = JSON.stringify(data)
-
-    const options = {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': dataString.length,
-        },
-        timeout: 0,
-    }
-
-    // return new Promise((resolve, reject) => {
-    //     const req = https.request(url, options, (res) => {
-    //         if (res.statusCode < 200 || res.statusCode > 299) {
-    //             return reject(new Error(`HTTP status code ${res.statusCode}`))
-    //         }
-
-    //         const body = []
-    //         res.on('data', (chunk) => body.push(chunk))
-    //         res.on('end', () => {
-    //             const resString = Buffer.concat(body).toString()
-    //             resolve(resString)
-    //         })
-    //     })
-
-    //     req.on('error', (err) => {
-    //         reject(err)
-    //     })
-
-    //     req.on('timeout', () => {
-    //         req.destroy()
-    //         reject(new Error('Request time out'))
-    //     })
-
-    //     req.write(dataString)
-    //     req.end()
-    // })
-
     let response = await fetch(url, {
         body: dataString,
         headers: {
