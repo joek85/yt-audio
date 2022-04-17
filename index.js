@@ -159,12 +159,13 @@ const parsePlaylist = (data) => {
     let renderers = contents.itemSectionRenderer.contents[0].playlistVideoListRenderer;
     for (let video of renderers.contents) {
         if (video.playlistVideoRenderer) {
+            
             playlist.videos.push({
                 videoId: video.playlistVideoRenderer.videoId,
                 thumbnails: prepImg(video.playlistVideoRenderer.thumbnail.thumbnails)[0],
                 title: video.playlistVideoRenderer.title.runs[0].text,
                 subtitle: video.playlistVideoRenderer.shortBylineText ? video.playlistVideoRenderer.shortBylineText.runs[0].text : '',
-                duration: video.playlistVideoRenderer.lengthText.simpleText
+                duration: video.playlistVideoRenderer.lengthText ? video.playlistVideoRenderer.lengthText.simpleText : ''
             })
         }
     }
@@ -250,7 +251,7 @@ const parseChannelInfos = (data) => {
                                                 videos.items.push({
                                                     channelId: video.gridChannelRenderer.channelId,
                                                     thumbnails: prepImg(video.gridChannelRenderer.thumbnail.thumbnails)[0],
-                                                    videoCounts: video.gridChannelRenderer.videoCountText.runs[0].text,
+                                                    videoCounts: video.gridChannelRenderer.videoCountText ? video.gridChannelRenderer.videoCountText.runs[0].text : 0,
                                                     subscribers: video.gridChannelRenderer.subscriberCountText ? video.gridChannelRenderer.subscriberCountText.simpleText : '',
                                                     title: video.gridChannelRenderer.title.simpleText
                                                 })
@@ -267,7 +268,7 @@ const parseChannelInfos = (data) => {
                                                     published: video.videoRenderer.publishedTimeText ? video.videoRenderer.publishedTimeText.simpleText : '',
                                                     views: video.videoRenderer.shortViewCountText.simpleText,
                                                     subtitle: video.videoRenderer.shortBylineText ? video.videoRenderer.shortBylineText.runs[0].text : '',
-                                                    duration: video.videoRenderer.lengthText.simpleText
+                                                    duration: video.videoRenderer.lengthText ? video.videoRenderer.lengthText.simpleText : ''
                                                 })
                                             } else if (video.playlistRenderer) {
                                                 videos.type = 'playlists';
@@ -521,6 +522,26 @@ const parseSearchResults = (data) => {
                             items: parseCards(i.horizontalCardListRenderer)
                         });
                         break;
+                    case 'playlistRenderer':
+                        primaryResults.push({
+                            type: 'playlist',
+                            items: {
+                                playlistId: i.playlistRenderer.playlistId,
+                                thumbnails: prepImg(i.playlistRenderer.thumbnails[0].thumbnails)[0],
+                                title: i.playlistRenderer.title.simpleText,
+                                subtitle: i.playlistRenderer.shortBylineText.runs[0].text,
+                                channelId: i.playlistRenderer.shortBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId,
+                                videoCounts: i.playlistRenderer.videoCountText.runs.map(text => { return text.text }).join(""),
+                                videos: i.playlistRenderer.videos.map(renderer => {
+                                    return {
+                                        title: renderer.childVideoRenderer.title.simpleText,
+                                        duration: renderer.childVideoRenderer.lengthText.simpleText,
+                                        videoId: renderer.childVideoRenderer.videoId
+                                    }
+                                })
+                            }
+                        })
+                        break;
                 }
             }
         }
@@ -612,6 +633,7 @@ const parseSecondaryContents = (renderer) => {
     let sections = [];
 
     if (container) {
+        console.log(container.callToAction.watchCardHeroVideoRenderer)
         header = {
             title: container.header.watchCardRichHeaderRenderer.title.simpleText,
             subtitle: container.header.watchCardRichHeaderRenderer.subtitle.simpleText,

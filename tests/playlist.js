@@ -1,7 +1,7 @@
 import ytaudio from "../index.js";
 
-let playlistId = 'RDCLAK5uy_nGZRi-an-ruqiZlNJSGhCDHucdp2FBNfI';
+let playlistId = 'PL_vvkuQ8VEn53Rh9Hd8fFzyPAnUh3SPJz';
 
 let videos = await ytaudio.getPlaylist(playlistId);
 
-console.log(videos)
+// console.log(videos)

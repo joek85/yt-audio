@@ -4,7 +4,7 @@ import fs from 'fs';
 const filepath = path.resolve('/home/joe/Documents/WebstormProjects/yt-audio/', 'info.json');
 let searchQuery = 'inna';
 
-let search = await ytaudio.getSearchResults(searchQuery, 'EgIQAg%253D%253D');
+let search = await ytaudio.getSearchResults(searchQuery, '', '');
 
 //   const json = JSON.stringify(search, null, 2)
 //     // eslint-disable-next-line max-len
@@ -12,4 +12,4 @@ let search = await ytaudio.getSearchResults(searchQuery, 'EgIQAg%253D%253D');
 //   fs.writeFile(filepath, json, err2 => {
 //     if (err2) throw err2;
 //   });
-console.log(search)
+// console.log(search)
