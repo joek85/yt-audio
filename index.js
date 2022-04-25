@@ -8,6 +8,7 @@ const SEARCH_API = 'https://www.youtube.com/youtubei/v1/search?key=AIzaSyAO_FJ2S
 const BASE_URL = 'https://www.youtube.com/watch?v=';
 const EMBED_URL = 'https://www.youtube.com/embed/';
 const SEARCH_URL = 'https://www.youtube.com/results?gl=US&hl=en&search_query='
+const TRENDING_URL = 'https://www.youtube.com/feed/trending?bp=4gINGgt5dG1hX2NoYXJ0cw%3D%3D'
 
 const DEFAULT_CONTEXT = {
     client: {
@@ -17,11 +18,26 @@ const DEFAULT_CONTEXT = {
 };
 
 const context = JSON.parse(JSON.stringify(DEFAULT_CONTEXT));
-
+export const getTrendingPage = async () => {
+    try {
+        const response = await fetch(TRENDING_URL + '&gl=US&hl=en', {
+            method: 'GET'
+        })
+        let data = await response.text();
+        let pos = data.indexOf('var ytInitialData = ')
+        let ytInitialData = data.slice(pos + 'var ytInitialData = '.length)
+        let posEnd = ytInitialData.indexOf(';</script>')
+        let results = data.slice(pos + 'var ytInitialData = '.length, pos + 'var ytInitialData = '.length + posEnd)
+        return parseTrending(JSON.parse(results))
+    } catch (error) {
+        console.log(error)
+        return error
+    }
+}
 export const getSearchResults = async (searchQuery, params, continuation) => {
     try {
         if (continuation.token) {
-            console.log(continuation)
+            // console.log(continuation)
             let data = {
                 context: context, query: searchQuery, continuation: continuation.token,
                 clickTracking: { clickTrackingParams: continuation.clickTrackingParams }
@@ -122,8 +138,14 @@ export const getPlaylist = async (browseId, clickTrackingParams) => {
     }
 };
 
-
-
+const parseTrending = (data) => {
+    let items = data.contents.twoColumnBrowseResultsRenderer.tabs[1].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].shelfRenderer.content.expandedShelfContentsRenderer.items
+    let videos = []
+    for (let renderer of items) {
+        videos.push(parseVideoRenderer(renderer.videoRenderer))
+    }
+    return videos
+};
 const parseVideoDetails = async (data) => {
     let videoDetails = {};
 
@@ -159,7 +181,7 @@ const parsePlaylist = (data) => {
     let renderers = contents.itemSectionRenderer.contents[0].playlistVideoListRenderer;
     for (let video of renderers.contents) {
         if (video.playlistVideoRenderer) {
-            
+
             playlist.videos.push({
                 videoId: video.playlistVideoRenderer.videoId,
                 thumbnails: prepImg(video.playlistVideoRenderer.thumbnail.thumbnails)[0],
@@ -227,13 +249,14 @@ const parseChannelInfos = (data) => {
                                             videoId: video.videoRenderer.videoId,
                                             thumbnails: prepImg(video.videoRenderer.thumbnail.thumbnails)[0],
                                             title: video.videoRenderer.title.runs[0].text,
-                                            views: video.videoRenderer.shortViewCountText.runs[0].text + video.videoRenderer.shortViewCountText.runs[1].text,
+                                            views: video.videoRenderer.shortViewCountText ? (video.videoRenderer.shortViewCountText.runs[0].text + video.videoRenderer.shortViewCountText.runs[1].text) : '',
                                             description: video.videoRenderer.descriptionSnippet.runs[0].text
                                         })
                                     }
+                                    console.log(SectionRenderer.channelFeaturedContentRenderer)
                                     item.tabs.items.push({
                                         type: 'channelFeaturedVideos',
-                                        title: SectionRenderer.channelFeaturedContentRenderer.title.runs[0].text + SectionRenderer.channelFeaturedContentRenderer.title.runs[1].text,
+                                        title: SectionRenderer.channelFeaturedContentRenderer.title ? (SectionRenderer.channelFeaturedContentRenderer.title.runs[0].text + SectionRenderer.channelFeaturedContentRenderer.title.runs[1].text) : '',
                                         videos: videos
                                     })
                                 } else if (SectionRenderer.shelfRenderer) {
@@ -295,6 +318,7 @@ const parseChannelInfos = (data) => {
                                         type: 'shelf',
                                         title: SectionRenderer.shelfRenderer.title.runs[0].text,
                                         subtitle: SectionRenderer.shelfRenderer.subtitle ? SectionRenderer.shelfRenderer.subtitle.simpleText : '',
+                                        browseId: SectionRenderer.shelfRenderer.title.runs[0].navigationEndpoint.browseEndpoint.canonicalBaseUrl ? '' : SectionRenderer.shelfRenderer.title.runs[0].navigationEndpoint.browseEndpoint.browseId.substring(2),
                                         videos: videos
                                     })
                                 }
@@ -633,7 +657,7 @@ const parseSecondaryContents = (renderer) => {
     let sections = [];
 
     if (container) {
-        console.log(container.callToAction.watchCardHeroVideoRenderer)
+        // console.log(container.callToAction.watchCardHeroVideoRenderer)
         header = {
             title: container.header.watchCardRichHeaderRenderer.title.simpleText,
             subtitle: container.header.watchCardRichHeaderRenderer.subtitle.simpleText,
@@ -698,7 +722,7 @@ const parseHorizontalCardListRenderer = (renderer) => {
 const parseVideoRenderer = (renderer) => {
     return {
         videoId: renderer.videoId,
-        title: renderer.title.runs[0].text,
+        title: renderer.title.runs ? renderer.title.runs[0].text : '',
         thumbnail: prepImg(renderer.thumbnail.thumbnails)[0],
         published: renderer.publishedTimeText ? renderer.publishedTimeText.simpleText : '',
         duration: renderer.lengthText ? renderer.lengthText.simpleText : '',
@@ -790,6 +814,7 @@ export default {
     getChannelPlaylists,
     getChannelVideos,
     getPlaylist,
-    getSearchResults
+    getSearchResults,
+    getTrendingPage
 }
 
