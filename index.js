@@ -441,6 +441,7 @@ const parseRelatedVideos = (data) => {
 
         }
         let details = result.compactVideoRenderer;
+        
         if (details) {
 
             let viewCount = details.viewCountText ? details.viewCountText.simpleText : '';
