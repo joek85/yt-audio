@@ -78,6 +78,19 @@ export const getPlayerMix = async (playlistId, clickTrackingParams, params) => {
         return err
     }
 };
+export const getPlayerData = async (videoId) => {
+    let data = {
+        context: context,        
+        videoId: videoId,
+    };
+    try {
+        const details = await post(PLAYER_API, data);
+        return (details)
+    } catch (err) {
+        console.log(err);
+        return err
+    }
+};
 export const getChannelInfos = async (channelId) => {
     let data = { context: context, browseId: channelId };
     try {
@@ -864,6 +877,7 @@ async function post(url, data) {
     return await response.json()
 }
 export default {
+    getPlayerData,
     getPlayerMix,
     getRelatedVideos,
     getChannelInfos,
