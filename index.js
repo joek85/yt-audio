@@ -61,11 +61,18 @@ export const getSearchResults = async (searchQuery, params, continuation) => {
         return err
     }
 };
-export const getPlayerdata = async (videoId) => {
-    let data = { context: context, videoId: videoId };
+export const getPlayerMix = async (playlistId, clickTrackingParams, params) => {
+    let data = {
+        context: context,
+        // clickTracking: { clickTrackingParams: 'CH8QozAYBCITCJP7_u3o3_cCFQ8UBgAdGf8CVDIKbGlzdF9vdGhlcpoBBQgMEPgd' },
+        
+        playlistId: playlistId,
+        // params: 'OALAAQHCAwtuakN5Wk9RcXRKVQ%3D%3D',
+
+    };
     try {
-        const details = await post(PLAYER_API, data);
-        return (details)
+        const details = await post(RELATED_API, data);
+        return parseMix(details)
     } catch (err) {
         console.log(err);
         return err
@@ -137,6 +144,40 @@ export const getPlaylist = async (browseId, clickTrackingParams) => {
         return err
     }
 };
+
+const parseMix = (data) => {
+    let playlist = data.contents.twoColumnWatchNextResults.playlist.playlist
+    let videos = []
+    let contents = playlist.contents
+
+    for (const playlistPanelVideoRenderer of contents) {
+
+        let videoRenderer = playlistPanelVideoRenderer.playlistPanelVideoRenderer
+        
+        videos.push({
+            title: videoRenderer.title.simpleText,
+            author: videoRenderer.longBylineText.runs[0].text,
+            videoId: videoRenderer.videoId,
+            thumbnail: prepImg(videoRenderer.thumbnail.thumbnails)[0],
+            duration: videoRenderer.lengthText.simpleText,
+            selected: videoRenderer.selected,
+            playlistSetVideoId: videoRenderer.playlistSetVideoId,
+            playlistId: videoRenderer.navigationEndpoint.watchEndpoint.playlistId,
+            index: videoRenderer.navigationEndpoint.watchEndpoint.index,
+            params: videoRenderer.navigationEndpoint.watchEndpoint.params
+
+        })
+    }
+    return {
+        title: playlist.title,
+        author: playlist.ownerName.simpleText,
+        playlistId: playlist.playlistId,
+        currentIndex: playlist.currentIndex,
+        localCurrentIndex: playlist.localCurrentIndex,
+        trackingParams: playlist.trackingParams,
+        videos: videos
+    }
+}
 
 const parseTrending = (data) => {
     let items = data.contents.twoColumnBrowseResultsRenderer.tabs[1].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].shelfRenderer.content.expandedShelfContentsRenderer.items
@@ -441,7 +482,7 @@ const parseRelatedVideos = (data) => {
 
         }
         let details = result.compactVideoRenderer;
-        
+
         if (details) {
 
             let viewCount = details.viewCountText ? details.viewCountText.simpleText : '';
@@ -475,20 +516,34 @@ const parseRelatedVideos = (data) => {
                 isLive: !!(details.badges && details.badges.find(b => b.metadataBadgeRenderer.label === 'LIVE NOW')),
             };
             videos.push(video);
-        } else {
+        } else if (result.compactPlaylistRenderer) {
             let playlistRenderer = result.compactPlaylistRenderer;
-            if (playlistRenderer) {
-                let playlist = {
-                    type: 'playlist',
-                    id: playlistRenderer.playlistId,
-                    title: playlistRenderer.title.simpleText,
-                    subtitle: playlistRenderer.shortBylineText.runs[0].text,
-                    thumbnail: prepImg(playlistRenderer.thumbnail.thumbnails)[0],
-                    published: playlistRenderer.publishedTimeText ? playlistRenderer.publishedTimeText.simpleText : '',
-                    count: playlistRenderer.videoCountShortText.simpleText
-                };
-                videos.push(playlist)
+            let playlist = {
+                type: 'playlist',
+                id: playlistRenderer.playlistId,
+                title: playlistRenderer.title.simpleText,
+                subtitle: playlistRenderer.shortBylineText.runs[0].text,
+                thumbnail: prepImg(playlistRenderer.thumbnail.thumbnails)[0],
+                published: playlistRenderer.publishedTimeText ? playlistRenderer.publishedTimeText.simpleText : '',
+                count: playlistRenderer.videoCountShortText.simpleText
+            };
+            videos.push(playlist)
+
+        } else if (result.compactRadioRenderer) {
+            // console.log(result.compactRadioRenderer)
+            let compactRadioRenderer = result.compactRadioRenderer
+            let mix = {
+                type: 'mix',
+                playlistId: compactRadioRenderer.playlistId,
+                videoId: compactRadioRenderer.navigationEndpoint.watchEndpoint.videoId,
+                thumbnail: prepImg(compactRadioRenderer.thumbnail.thumbnails)[0],
+                title: compactRadioRenderer.title.simpleText,
+                author: compactRadioRenderer.shortBylineText.simpleText,
+                videoCounts: compactRadioRenderer.videoCountShortText.runs[0].text,
+                clickTrackingParams: compactRadioRenderer.navigationEndpoint.clickTrackingParams,
+                params: compactRadioRenderer.navigationEndpoint.watchEndpoint.params
             }
+            videos.push(mix)
         }
     }
 
@@ -809,7 +864,7 @@ async function post(url, data) {
     return await response.json()
 }
 export default {
-    getPlayerdata,
+    getPlayerMix,
     getRelatedVideos,
     getChannelInfos,
     getChannelPlaylists,
