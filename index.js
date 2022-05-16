@@ -543,7 +543,7 @@ const parseRelatedVideos = (data) => {
             videos.push(playlist)
 
         } else if (result.compactRadioRenderer) {
-            // console.log(result.compactRadioRenderer)
+            
             let compactRadioRenderer = result.compactRadioRenderer
             let mix = {
                 type: 'mix',
