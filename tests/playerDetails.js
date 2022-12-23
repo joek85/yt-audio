@@ -1,7 +1,6 @@
 import ytaudio from "../index.js";
-import fetch from 'node-fetch';
 
-const videoId = '-EJHanyDBnQ'
-let details = await ytaudio.getPlayerData(videoId);
-console.log(details.chapters)
+const videoId = 'OfgnifvL4O0'
+let details = await ytaudio.getPlayerBase(videoId);
+//console.log(details.videoDetails.formats)
    

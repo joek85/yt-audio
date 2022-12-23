@@ -2,7 +2,7 @@ import ytaudio from "../index.js";
 import path from'path';
 import fs from 'fs';
 const filepath = path.resolve('/home/joe/Documents/WebstormProjects/yt-audio/', 'info.json');
-let searchQuery = 'asot live';
+let searchQuery = 'inna';
 
 let search = await ytaudio.getSearchResults(searchQuery, '', '');
 
@@ -12,4 +12,4 @@ let search = await ytaudio.getSearchResults(searchQuery, '', '');
 //   fs.writeFile(filepath, json, err2 => {
 //     if (err2) throw err2;
 //   });
- console.log(search.primaryResults)
+ console.log(search)

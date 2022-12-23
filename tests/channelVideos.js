@@ -1,9 +1,9 @@
 import ytaudio from "../index.js";
 
 
-let channelId = 'UC14ap4T608Zz_Mz4eezhIqw';
-let clickTrackingParams = 'CCQQ8JMBGAYiEwi2wsTlnpP0AhVgAwYAHS-eC-M=';
-let params = 'EgZ2aWRlb3M%3D';
+let channelId = 'UCr8RbU-D7iSvpy0ZO-AasoQ';
+let clickTrackingParams = 'CBgQ8JMBGAYiEwjEvLPRuf_7AhXOKfEFHb0jAIk=';
+let params = 'EgZ2aWRlb3PyBgQKAjoA';
 
 let videos = await ytaudio.getChannelVideos(channelId, clickTrackingParams, params);
 

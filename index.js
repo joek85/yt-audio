@@ -10,6 +10,8 @@ const EMBED_URL = 'https://www.youtube.com/embed/';
 const SEARCH_URL = 'https://www.youtube.com/results?gl=US&hl=en&search_query='
 const TRENDING_URL = 'https://www.youtube.com/feed/trending?bp=4gINGgt5dG1hX2NoYXJ0cw%3D%3D'
 
+const USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.98 Safari/537.36";
+
 const DEFAULT_CONTEXT = {
     client: {
         clientName: 'WEB',
@@ -17,6 +19,13 @@ const DEFAULT_CONTEXT = {
     },
 };
 
+const headersList = {
+    "Accept": "*/*",
+    "User-Agent": USER_AGENT,
+    "x-youtube-client-name": "1",
+    "x-youtube-client-version": "2.20210622.10.00",
+    "Content-Type": "application/json"
+}
 const context = JSON.parse(JSON.stringify(DEFAULT_CONTEXT));
 export const getTrendingPage = async () => {
     try {
@@ -35,13 +44,7 @@ export const getTrendingPage = async () => {
     }
 }
 export const getSearchResults = async (searchQuery, params, continuation) => {
-    let headersList = {
-        "Accept": "*/*",
-        "User-Agent": "node-fetch",
-        "x-youtube-client-name": "1",
-        "x-youtube-client-version": "2.20210622.10.00",
-        "Content-Type": "application/json"
-    }
+
     try {
         if (continuation.token) {
             let data = {
@@ -89,19 +92,33 @@ export const getPlayerMix = async (playlistId, clickTrackingParams, params) => {
 export const getPlayerData = async (videoId) => {
 
     try {
-        let headersList = {
-            "Accept": "*/*",
-            "User-Agent": "node-fetch",
-            "x-youtube-client-name": "1",
-            "x-youtube-client-version": "2.20210622.10.00",
-            "Content-Type": "application/json"
-        }
+
         let details = await fetch(BASE_URL + videoId + '&pbj=1&gl=US&hl=en', {
             method: "GET",
             headers: headersList
         });
         let data = await details.text();
         return parseVideoDetails(JSON.parse((data)))
+    } catch (err) {
+        console.log(err);
+        return err
+    }
+};
+export const getPlayerBase = async (videoId) => {
+    try {
+        let res = await fetch(EMBED_URL + videoId + '?gl=US&hl=en', {
+            method: "GET",
+            headers: headersList
+        });
+
+        let text = await res.text();
+
+        let player =
+            /<script\s+src="([^"]+)"(?:\s+type="text\/javascript")?\s+name="player_ias\/base"\s*>|"jsUrl":"([^"]+)"/
+                .exec(text);
+        let pos = player[0].indexOf('/s/player/')
+        let baseUrl = player[0].slice(pos + '/s/player/'.length - 1)
+        return baseUrl.split('"')[0]
     } catch (err) {
         console.log(err);
         return err
@@ -131,6 +148,7 @@ export const getChannelPlaylists = async (channelId, clickTrackingParams, params
     }
 };
 export const getChannelVideos = async (channelId, clickTrackingParams, params) => {
+
     let data = {
         context: context,
         browseId: channelId,
@@ -220,11 +238,18 @@ const parseVideoDetails = async (data) => {
     let results = {};
     let detailsPage = data[2];
     let watchPage = data[3];
+    let playabilityStatus = detailsPage.playerResponse.playabilityStatus;
     let videoDetails = {};
     let owner = {};
     let relatedVideos = [];
     let chapters = [];
 
+    if (playabilityStatus.status == "ERROR") return {
+        videoDetails: videoDetails,
+        owner: owner,
+        relatedVideos: relatedVideos,
+        chapters: chapters
+    };
     if (detailsPage) {
         let playerResponse = detailsPage.playerResponse;
 
@@ -310,6 +335,7 @@ const parsePlaylist = (data) => {
     let playlist = { sidebar: {}, videos: [] };
     let sidebar = data.sidebar.playlistSidebarRenderer.items[0].playlistSidebarPrimaryInfoRenderer;
     let renderer = sidebar.thumbnailRenderer.playlistVideoThumbnailRenderer || sidebar.thumbnailRenderer.playlistCustomThumbnailRenderer
+
     playlist.sidebar = {
         thumbnails: prepImg(renderer.thumbnail.thumbnails)[0],
         title: sidebar.title.runs[0].text,
@@ -538,15 +564,15 @@ const parseChannelPlaylists = (data) => {
     return playlists
 };
 const parseChannelVideos = (data) => {
-    let tabs = data.contents.twoColumnBrowseResultsRenderer.tabs;
-    let contents = tabs[1].tabRenderer.content.sectionListRenderer.contents;
-    let renderers = contents[0].itemSectionRenderer.contents[0];
-    let items = renderers.gridRenderer.items;
 
-    let videos = { videos: [], continuation: '' };
-    for (let video of items) {
-        if (video.gridVideoRenderer) {
-            videos.videos.push(parseGridVideoRenderer(video.gridVideoRenderer))
+    let tabs = data.contents.twoColumnBrowseResultsRenderer.tabs;
+    let contents = tabs[1].tabRenderer.content.richGridRenderer.contents;
+    let header = tabs[1].tabRenderer.content.richGridRenderer.header.feedFilterChipBarRenderer;
+    let videos = { videos: [], continuation: '', headers: [] };
+
+    for (let video of contents) {
+        if (video.richItemRenderer) {
+            videos.videos.push(parseGridVideoRenderer(video.richItemRenderer.content.videoRenderer))
         } else if (video.continuationItemRenderer) {
             let Token = video.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
             let ctp = video.continuationItemRenderer.continuationEndpoint.clickTrackingParams;
@@ -556,6 +582,14 @@ const parseChannelVideos = (data) => {
             }
         }
     }
+    for (const h of header.contents) {
+
+        videos.headers.push({
+            title: h.chipCloudChipRenderer.text.simpleText,
+            navigationEndpoint: h.chipCloudChipRenderer.navigationEndpoint
+        })
+    }
+    // console.log(h)
     return videos
 };
 const parseRelatedVideos = (data) => {
@@ -614,9 +648,9 @@ const parseRelatedVideos = (data) => {
                 view_count: viewCount,
                 length_seconds: details.lengthText !== undefined ? details.lengthText.simpleText : '',
                 thumbnails: prepImg(details.thumbnail.thumbnails)[0],
-                richThumbnails:
-                    details.richThumbnail ?
-                        details.richThumbnail.movingThumbnailRenderer.movingThumbnailDetails.thumbnails : [],
+                // richThumbnails:
+                //     details.richThumbnail ?
+                //         details.richThumbnail.movingThumbnailRenderer.movingThumbnailDetails.thumbnails : [],
                 isLive: !!(details.badges && details.badges.find(b => b.metadataBadgeRenderer.label === 'LIVE')),
             };
             videos.push(video);
@@ -828,7 +862,7 @@ const parseSecondaryContents = (renderer) => {
             subtitle: container.callToAction.watchCardHeroVideoRenderer.subtitle ? container.callToAction.watchCardHeroVideoRenderer.subtitle.simpleText : '',
             duration: container.callToAction.watchCardHeroVideoRenderer.lengthText ? container.callToAction.watchCardHeroVideoRenderer.lengthText.simpleText : '',
             thumbnail: container.callToAction.watchCardHeroVideoRenderer.heroImage.singleHeroImageRenderer ? prepImg(container.callToAction.watchCardHeroVideoRenderer.heroImage.singleHeroImageRenderer.thumbnail.thumbnails)[0] : '',
-            videoId: container.callToAction.watchCardHeroVideoRenderer.navigationEndpoint.watchEndpoint.videoId ? container.callToAction.watchCardHeroVideoRenderer.navigationEndpoint.watchEndpoint.videoId : ''
+            videoId: container.callToAction.watchCardHeroVideoRenderer.navigationEndpoint.watchEndpoint ? container.callToAction.watchCardHeroVideoRenderer.navigationEndpoint.watchEndpoint.videoId : ''
         };
         for (let section of container.sections) {
             let watchCard = section.watchCardSectionSequenceRenderer.lists[0];
@@ -897,11 +931,12 @@ const parseVideoRenderer = (renderer) => {
     }
 };
 const parseChannelRenderer = (renderer) => {
+
     return {
         channelId: renderer.channelId,
         title: renderer.title.simpleText,
         thumbnail: prepImg(renderer.thumbnail.thumbnails)[0],
-        videoCounts: renderer.videoCountText ? renderer.videoCountText.runs.map(text => { return text.text }).join("") : '',
+        videoCounts: renderer.videoCountText.runs ? renderer.videoCountText.runs.map(text => { return text.text }).join("") : renderer.videoCountText.simpleText,
         description: renderer.descriptionSnippet ? renderer.descriptionSnippet.runs[0].text : '',
         subscribers: renderer.subscriberCountText ? renderer.subscriberCountText.simpleText : ''
     }
@@ -941,6 +976,9 @@ const parseGridVideoRenderer = (renderer) => {
         duration: renderer.thumbnailOverlays[0].thumbnailOverlayTimeStatusRenderer.text.simpleText
     }
 };
+const parseRichItemRenderer = (renderer) => {
+
+}
 const findKey = (obj, key) => {
     for (let [k, v] of Object.entries(obj)) {
         if (k === key) return v;
@@ -960,7 +998,7 @@ async function post(url, data) {
     let response = await fetch(url, {
         body: dataString,
         headers: {
-            'Content-Type': 'application/json',
+            headersList,
             'Content-Length': dataString.length
         },
         method: 'post'
@@ -976,6 +1014,7 @@ export default {
     getChannelVideos,
     getPlaylist,
     getSearchResults,
-    getTrendingPage
+    getTrendingPage,
+    getPlayerBase
 }
 
