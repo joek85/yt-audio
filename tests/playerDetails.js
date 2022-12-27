@@ -1,6 +1,6 @@
 import ytaudio from "../index.js";
 
-const videoId = 'OfgnifvL4O0'
-let details = await ytaudio.getPlayerBase(videoId);
-//console.log(details.videoDetails.formats)
+const videoId = 'A6K95eQuneE'
+let details = await ytaudio.getPlayerData(videoId);
+console.log(details)
    

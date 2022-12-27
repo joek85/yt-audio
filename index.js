@@ -16,6 +16,8 @@ const DEFAULT_CONTEXT = {
     client: {
         clientName: 'WEB',
         clientVersion: '2.20201021.03.00',
+        hl: 'en',
+        gl: 'US'
     },
 };
 
@@ -129,6 +131,7 @@ export const getChannelInfos = async (channelId) => {
     try {
         const infos = await post(CHANNEL_API, data)
         return parseChannelInfos(infos)
+        //return infos
     } catch (err) {
         return err
     }
@@ -378,16 +381,21 @@ const parsePlaylists = (playlist) => {
 };
 const parseChannelInfos = (data) => {
     let channelInfos = { header: {}, items: [] };
-    let header = data.header.c4TabbedHeaderRenderer;
+    let header = data.header.c4TabbedHeaderRenderer ? data.header.c4TabbedHeaderRenderer : data.header.carouselHeaderRenderer.contents[1].topicChannelDetailsRenderer;
     let tabs = data.contents.twoColumnBrowseResultsRenderer.tabs;
-
+    let carouselThumbnails;
+    if (data.header.carouselHeaderRenderer) {
+        carouselThumbnails = data.header.carouselHeaderRenderer.contents[0].carouselItemRenderer.carouselItems[0].defaultPromoPanelRenderer.largeFormFactorBackgroundThumbnail.thumbnailLandscapePortraitRenderer.landscape;
+    }
     if (header) {
         channelInfos.header.channelId = header.channelId;
-        channelInfos.header.title = header.title;
+        channelInfos.header.title = header.title.simpleText ? header.title.simpleText : header.title;
         channelInfos.header.avatar = prepImg(header.avatar.thumbnails)[0];
-        channelInfos.header.banner = header.banner ? prepImg(header.banner.thumbnails)[0] : [];
+        channelInfos.header.banner = header.banner ? prepImg(header.banner.thumbnails)[0] : prepImg(carouselThumbnails.thumbnails)[0];
         channelInfos.header.subscribers = header.subscriberCountText ? header.subscriberCountText.simpleText : '';
         channelInfos.header.descriptions = data.metadata.channelMetadataRenderer.description;
+    } else {
+        channelInfos.header = null;
     }
 
     if (tabs) {
@@ -399,6 +407,7 @@ const parseChannelInfos = (data) => {
                         let contents = tab.tabRenderer.content;
                         if (contents) {
                             let sectionListRenderer = contents.sectionListRenderer.contents;
+
                             for (let itemSectionRenderer of sectionListRenderer) {
                                 let SectionRenderer = itemSectionRenderer.itemSectionRenderer.contents[0];
                                 if (SectionRenderer.channelVideoPlayerRenderer) {
@@ -421,7 +430,6 @@ const parseChannelInfos = (data) => {
                                             description: video.videoRenderer.descriptionSnippet.runs[0].text
                                         })
                                     }
-                                    console.log(SectionRenderer.channelFeaturedContentRenderer)
                                     item.tabs.items.push({
                                         type: 'channelFeaturedVideos',
                                         title: SectionRenderer.channelFeaturedContentRenderer.title ? (SectionRenderer.channelFeaturedContentRenderer.title.runs[0].text + SectionRenderer.channelFeaturedContentRenderer.title.runs[1].text) : '',
@@ -430,6 +438,7 @@ const parseChannelInfos = (data) => {
                                 } else if (SectionRenderer.shelfRenderer) {
                                     let videos = { type: '', items: [] };
                                     if (SectionRenderer.shelfRenderer.content.horizontalListRenderer) {
+                                        console.log(SectionRenderer.shelfRenderer.content.horizontalListRenderer.items)
                                         for (let video of SectionRenderer.shelfRenderer.content.horizontalListRenderer.items) {
                                             if (video.gridVideoRenderer) {
                                                 videos.type = 'videos';
@@ -660,7 +669,7 @@ const parseRelatedVideos = (data) => {
                 type: 'playlist',
                 id: playlistRenderer.playlistId,
                 title: playlistRenderer.title.simpleText,
-                subtitle: playlistRenderer.shortBylineText.runs[0].text,
+                subtitle: playlistRenderer.shortBylineText.runs ? playlistRenderer.shortBylineText.runs[0].text : playlistRenderer.shortBylineText.simpleText,
                 thumbnail: prepImg(playlistRenderer.thumbnail.thumbnails)[0],
                 published: playlistRenderer.publishedTimeText ? playlistRenderer.publishedTimeText.simpleText : '',
                 count: playlistRenderer.videoCountShortText.simpleText
