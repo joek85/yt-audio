@@ -757,7 +757,7 @@ const parseSearchResults = (data) => {
                                 thumbnails: prepImg(i.playlistRenderer.thumbnails[0].thumbnails)[0],
                                 title: i.playlistRenderer.title.simpleText,
                                 subtitle: i.playlistRenderer.shortBylineText.runs[0].text,
-                                channelId: i.playlistRenderer.shortBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId,
+                                channelId: i.playlistRenderer.shortBylineText.runs[0].navigationEndpoint ? i.playlistRenderer.shortBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId : '',
                                 videoCounts: i.playlistRenderer.videoCountText.runs.map(text => { return text.text }).join(""),
                                 videos: i.playlistRenderer.videos.map(renderer => {
                                     return {
